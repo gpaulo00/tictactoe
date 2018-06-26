@@ -1,4 +1,7 @@
 
+import numpy as np
+from keras.models import model_from_json
+
 # load neural network from disk
 def load(name, out="models"):
   # read json model
