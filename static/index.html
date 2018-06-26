@@ -21,19 +21,37 @@
     <div id="app">
       <table id="board" class="board">
         <tr>
-          <td @click="select(0)" id="one" class="even">{{ toSymbol(matrix[0]) }}</td>
-          <td @click="select(1)" id="two">{{ toSymbol(matrix[1]) }}</td>
-          <td @click="select(2)" id="three" class="even">{{ toSymbol(matrix[2]) }}</td>
+          <td @click="select(0)" id="one" :class="{'even': true, 'player': fromPlayer(0)}">
+            {{ toSymbol(matrix[0]) }}
+          </td>
+          <td @click="select(1)" id="two" :class="{'player': fromPlayer(1)}">
+            {{ toSymbol(matrix[1]) }}
+          </td>
+          <td @click="select(2)" id="three" :class="{'even': true, 'player': fromPlayer(2)}">
+            {{ toSymbol(matrix[2]) }}
+          </td>
         </tr>
         <tr>
-          <td @click="select(3)" id="four">{{ toSymbol(matrix[3]) }}</td>
-          <td @click="select(4)" id="five" class="even">{{ toSymbol(matrix[4]) }}</td>
-          <td @click="select(5)" id="six">{{ toSymbol(matrix[5]) }}</td>
+          <td @click="select(3)" id="four" :class="{'player': fromPlayer(3)}">
+            {{ toSymbol(matrix[3]) }}
+          </td>
+          <td @click="select(4)" id="five" :class="{'even': true, 'player': fromPlayer(4)}">
+            {{ toSymbol(matrix[4]) }}
+          </td>
+          <td @click="select(5)" id="six" :class="{'player': fromPlayer(5)}">
+            {{ toSymbol(matrix[5]) }}
+          </td>
         </tr>
         <tr>
-          <td @click="select(6)" id="seven" class="even">{{ toSymbol(matrix[6]) }}</td>
-          <td @click="select(7)" id="eight">{{ toSymbol(matrix[7]) }}</td>
-          <td @click="select(8)" id="nine" class="even">{{ toSymbol(matrix[8]) }}</td>
+          <td @click="select(6)" id="seven" :class="{'even': true, 'player': fromPlayer(6)}">
+            {{ toSymbol(matrix[6]) }}
+          </td>
+          <td @click="select(7)" id="eight" :class="{'player': fromPlayer(7)}">
+            {{ toSymbol(matrix[7]) }}
+          </td>
+          <td @click="select(8)" id="nine" :class="{'even': true, 'player': fromPlayer(8)}">
+            {{ toSymbol(matrix[8]) }}
+          </td>
         </tr>
       </table>
 
@@ -43,42 +61,60 @@
 
         <label for="checkbox">Is it lost?</label>
         <input type="checkbox" name="islost" id="islost" v-model="isLose">
+
+        <div>
+          Remaining: {{ arr.length }}
+          <br/> Plays: {{ n }}
+        </div>
+      </div>
+
+      <div v-if="message !== null">
+        {{ message }}
       </div>
 
       <button @click="nextCase" id="btn-next">Next</button>
-      <button @click="reset" name="reset" id="reset">Reset</button>
+      <button @click="reset(true)" name="reset" id="reset">Reset</button>
+      <button @click="checkpoint" id="checkpoint">Checkpoint</button>
     </div>
   </center>
   <script>
+    const finished = "last-index"
+
     var app = new Vue({
       el: '#app',
       data: () => ({
         // visual data
+        original: [0, 0, 0, 0, 0, 0, 0, 0, 0],
         matrix: [0, 0, 0, 0, 0, 0, 0, 0, 0],
 
         // data generation
         res: [0, 0, 0, 0, 0, 0, 0, 0, 0],
         arr: [],
-        results: [],
+        cache: [],
         isWin: false,
         isLose: false,
 
         // others
+        n: 0,
         turn: 1,
         ai: true,
+        message: null,
       }),
-      computed: {
-        token() {
-          return btoa(JSON.stringify(this.matrix))
-        }
-      },
-      mounted() {
-        axios.get(`/data`)
-          .then(({ data }) => {
+      // computed: {
+      //   token() {
+      //     return btoa(JSON.stringify(this.matrix))
+      //   }
+      // },
+      async mounted() {
+        if (!this.loadFromStorage()) {
+          try {
+            const { data } = await axios.get("/data");
             this.arr = data;
-            this.matrix = _.cloneDeep(data[0]);
-          })
-          .catch(err => console.error(err));
+            this.loadNext();
+          } catch (err) {
+            console.error(err);
+          }
+        }
       },
       // updated() {
       //   if (this.ai && this.turn === 0) {
@@ -91,13 +127,20 @@
       //   }
       // },
       methods: {
+        fromPlayer(n) {
+          return this.matrix[n] !== this.original[n];
+        },
+
         // reset board
-        reset() {
-          this.matrix = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+        reset(r) {
+          if (r) {
+            this.matrix = _.cloneDeep(this.original);
+          } else {
+            this.matrix = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+            this.original = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+          }
           this.res = [0, 0, 0, 0, 0, 0, 0, 0, 0];
           this.turn = 1;
-          this.isWin = false;
-          this.isLose = false;
         },
 
         // convert number to symbol
@@ -114,7 +157,7 @@
 
           // set cell
           if (this.matrix[n] === 0) {
-            // this.$set(this.matrix, n, this.turn);
+            this.$set(this.matrix, n, 1/* this.turn */);
             this.$set(this.res, n, 1);
             //   if (this.ai) this.turn = 0;
           }
@@ -129,36 +172,113 @@
             i[0], i[3], i[6],
           ]
         },
+        mirror(x1) {
+          const i = _.cloneDeep(x1)
+
+          // horizontal
+          const x2 = [
+            i[2], i[1], i[0],
+            i[5], i[4], i[3],
+            i[8], i[7], i[6],
+          ]
+
+          // vertical
+          const x3 = [
+            i[6], i[7], i[8],
+            i[3], i[4], i[5],
+            i[0], i[1], i[2],
+          ]
+
+          return [x2, x3];
+        },
         rotations(x1) {
           const x2 = this.rot90(x1)
           const x3 = this.rot90(x2)
           const x4 = this.rot90(x3)
-          return [x1, x2, x3, x4]
+          return [x2, x3, x4];
+        },
+        mutations(x1) {
+          const x2 = _.flatMap(this.mirror(x1), i => this.rotations(i));
+          const x3 = _.flatMap(this.rotations(x1), i => this.mirror(i));
+          return _.concat([x1], x2, x3);
+        },
+
+
+        // load from storage
+        loadFromStorage() {
+          // check if it's finished
+          const all = localStorage.getItem("all");
+          if (all) this.message = "Finished!";
+
+          // check n of iterations
+          const n = localStorage.getItem("n");
+          if (n) this.n = JSON.parse(n);
+
+          // get array from localStorage
+          const res = localStorage.getItem("results");
+          if (res) {
+            this.arr = JSON.parse(res);
+            this.loadNext();
+            return true;
+          }
+          return false;
+        },
+        loadNext() {
+          this.matrix = _.cloneDeep(this.arr[0]);
+          this.original = _.cloneDeep(this.arr[0]);
+        },
+        async checkpoint() {
+          // upload results
+          await Promise.all(this.cache.map(async (value) => {
+            const res = btoa(JSON.stringify(value));
+            try {
+              const { data } = await axios.get(`/results/${res}`)
+              // console.log("successfully upload data");
+            } catch (err) {
+              console.error(err);
+            }
+          }));
+          this.cache = [];
+
+
+          // save
+          localStorage.setItem("results", JSON.stringify(this.arr));
+          localStorage.setItem("n", JSON.stringify(this.n));
         },
 
         // handle next operation
-        nextCase() {
+        async nextCase() {
           // 9 (moves) - 2 (is won/lost?)
-          const inputs = this.rotations(_.cloneDeep(this.matrix));
-          const outputs = this.rotations(_.cloneDeep(this.res))
+          const inputs = this.mutations(_.cloneDeep(this.original));
+          const outputs = this.mutations(_.cloneDeep(this.res))
             .map(v => v.concat([this.isWin + 0, this.isLose + 0]));
+          console.log({ inputs, outputs });
 
-          let next = 0;
-          this.arr.map((orig, idx) => {
+          this.arr = _.reject(await Promise.all(this.arr.map(async (orig, idx) => {
             // check if it's equal to the resolved move
             const found = _.findIndex(inputs, i => _.isEqual(i, orig))
             if (found === -1) return orig;
 
-            // if it's the original one
-            if (found === 0) next = idx + 1
-
             // set output in results
-            this.results[idx] = outputs[found];
-          });
+            // orig.shape 9,
+            // outputs[found] 11,
+            const d = orig.concat(outputs[found]);
+            this.cache.push(d);
+
+            return null;
+          })), n => n === null);
 
           // set new board
           this.reset();
-          this.matrix = _.cloneDeep(this.arr[next]);
+          this.n += 1;
+
+          // finished
+          if (this.arr.length === 0) {
+            localStorage.setItem("all", JSON.stringify(true));
+            this.message = "Finished";
+          }
+
+          this.loadNext();
         },
       }
     })

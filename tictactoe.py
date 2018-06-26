@@ -66,5 +66,28 @@ boards = json.dumps(np.loadtxt("board_positions.csv").tolist())
 def matrixData():
   return boards
 
+# :9 (board), 9:18 (move), 18: (win, lose)
+results = np.load("tictactoe.npy").tolist()
+@app.route("/results/<data>")
+def saveResults(data):
+  i = json.loads(base64.b64decode(data))
+  results.append(i)
+  return json.dumps({ "ok": True })
+
+@app.route("/save")
+def checkpoint():
+  np.save("tictactoe", np.array(results))
+  return json.dumps({ "ok": True })
+
+store = None
+@app.route("/storage/<data>")
+def storage(data):
+  store = json.loads(base64.b64decode(data))
+  return json.dumps({ "ok": True })
+
+@app.route("/storage")
+def getStorage():
+  return json.dumps(store)
+
 if __name__ == '__main__':
   app.run(host= '0.0.0.0')
