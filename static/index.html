@@ -5,78 +5,85 @@
   <meta charset="utf-8">
   <meta name="author" content="Gustavo Paulo">
   <title>Tic Tac Toe</title>
-  <link rel="stylesheet" href="static/game.css" type="text/css" media="screen" charset="utf-8">
+
+  <link rel="stylesheet" href="static/game.css" type="text/css" charset="utf-8">
+  <link rel="stylesheet" href="https://yarnpkg.com/en/package/normalize.css" type="text/css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet">
   <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
 
   <!-- vue -->
-  <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+  <!-- <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script> -->
   <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.10/lodash.min.js" integrity="sha256-/GKyJ0BQJD8c8UYgf7ziBrs/QgcikS7Fv/SaArgBcEI="
     crossorigin="anonymous"></script>
-  <!-- <script src="https://cdn.jsdelivr.net/npm/vue"></script> -->
+  <script src="https://cdn.jsdelivr.net/npm/vue"></script>
 </head>
 
 <body>
-  <center>
-    <h1>Tic Tac Toe</h1>
-    <div id="app">
-      <table id="board" class="board">
-        <tr>
-          <td @click="select(0)" id="one" class="even">
-            {{ toSymbol(matrix[0]) }}
-          </td>
-          <td @click="select(1)" id="two">
-            {{ toSymbol(matrix[1]) }}
-          </td>
-          <td @click="select(2)" id="three" class="even">
-            {{ toSymbol(matrix[2]) }}
-          </td>
-        </tr>
-        <tr>
-          <td @click="select(3)" id="four">
-            {{ toSymbol(matrix[3]) }}
-          </td>
-          <td @click="select(4)" id="five" class="even">
-            {{ toSymbol(matrix[4]) }}
-          </td>
-          <td @click="select(5)" id="six">
-            {{ toSymbol(matrix[5]) }}
-          </td>
-        </tr>
-        <tr>
-          <td @click="select(6)" id="seven" class="even">
-            {{ toSymbol(matrix[6]) }}
-          </td>
-          <td @click="select(7)" id="eight">
-            {{ toSymbol(matrix[7]) }}
-          </td>
-          <td @click="select(8)" id="nine" class="even">
-            {{ toSymbol(matrix[8]) }}
+  <div class="g-center">
+    <h1 id="g-title">Tic Tac Toe</h1>
+    <em>Gustavo Paulo</em>
+  </div>
+
+  <div id="app">
+    <div class="g-gameboard">
+      <!-- board -->
+      <table id="board" :class="{ 'board': true, 'game-over': finished }">
+        <tr :key="`row-${b}`" v-for="b in board">
+          <td v-for="i in _.range(b, b+3)" :key="`cell-${i}`" @click="select(i)" :id="numbers[i]" :class="{ 'g-cell': true, 'even': i%2 === 1, 'g-line': cells.includes(i) }">
+            {{ toSymbol(matrix[i]) }}
           </td>
         </tr>
       </table>
 
-      <div class="game-messages">
-        <h3 v-if="finished">FINISH</h3>
-      </div>
+      <!-- side column -->
+      <div id="sidebar">
+        <h2 v-if="finished" v-text="resultMsg" :class="{'g-won': win, 'g-lost': lose, 'g-tie': tie}"></h2>
+        <h2 v-else>Turn: {{ turnMsg }}</h2>
 
-      <button @click="reset" id="btn-reset">Reset</button>
+        <label class="container">Single Player
+          <input type="checkbox" v-model="ai" checked="checked">
+          <span class="checkmark"></span>
+        </label>
+
+        <a href="javascript:void(0)" @click="reset" class="g-button g-animate btn-blue">Reset</a>
+      </div>
     </div>
-  </center>
+  </div>
+
   <script>
     var app = new Vue({
       el: '#app',
       data: () => ({
-        // visual data
+        // visual data (-1 == player, 1 == IA/player 2)
         matrix: [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        board: [0, 3, 6],
+        numbers: ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine"],
 
         // others
         turn: -1,
         ai: true,
         finished: false,
+
+        // results
+        tie: false,
+        win: false,
+        lose: false,
+        cells: [],
       }),
       computed: {
         token() {
           return btoa(JSON.stringify(this.matrix))
+        },
+        resultMsg() {
+          if (this.win) return "You Win!";
+          else if (this.lose) return "You Lose!";
+          else if (this.tie) return "Tie!";
+          else return "";
+        },
+        turnMsg() {
+          if (this.turn === -1) return "Player 1";
+          else if (this.turn === 1) return "Player 2";
+          else return "PC";
         }
       },
       methods: {
@@ -85,6 +92,59 @@
           this.matrix = [0, 0, 0, 0, 0, 0, 0, 0, 0];
           this.turn = -1;
           this.finished = false;
+          this.cells = [];
+
+          this.tie = false;
+          this.win = false;
+          this.lose = false;
+        },
+
+        // check win/lose
+        getHorizontal(n) {
+          const i = n * 3;
+          return _.range(i, i + 3);
+        },
+        getVertical(n) {
+          return [n, n + 3, n + 6];
+        },
+        getDiagonal(n) {
+          return [n * 2, 4, 8 - (n * 2)];
+        },
+        check() {
+          const getters = [this.getHorizontal, this.getVertical, this.getDiagonal];
+
+          // get rows
+          for (i of _.range(3)) {
+            for (getter of getters) {
+              // ignore diagonal with index 2
+              if (getter === this.getDiagonal && i === 2) continue;
+
+              // get cells
+              const cells = getter(i);
+              const res = cells.map(n => this.matrix[n]).reduce((a, b) => a + b);
+
+              // results
+              if (res === -3) {
+                this.finished = true;
+                this.win = true;
+                this.cells = cells;
+                return true;
+              } else if (res === 3) {
+                this.finished = true;
+                this.lose = true;
+                this.cells = cells;
+                return true;
+              }
+            }
+          }
+
+          // tie
+          if (this.matrix.map(n => n !== 0).reduce((a, b) => a && b)) {
+            this.finished = true;
+            this.tie = true;
+            return true;
+          }
+          return false;
         },
 
         // convert number to symbol
@@ -102,6 +162,7 @@
           // set cell
           if (this.matrix[n] === 0) {
             this.$set(this.matrix, n, this.turn);
+            if (this.check()) return;
 
             // if IA enabled
             if (this.ai) {
@@ -110,6 +171,8 @@
               // suggest move with IA
               try {
                 const { data } = await axios.get(`/suggest/${this.token}`);
+
+                // unnecessary?
                 if (data[0] === null || data[1] === null) {
                   this.finished = true;
                   return
@@ -117,12 +180,13 @@
 
                 // set move
                 this.$set(this.matrix, (data[0] * 3) + data[1], 1);
+                if (this.check()) return;
                 this.turn = -1;
               } catch (err) {
-                console.error(err)
+                console.error(err);
               }
             } else {
-              this.turn = 1;
+              this.turn *= -1;
             }
           }
         },

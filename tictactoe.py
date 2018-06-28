@@ -4,14 +4,16 @@
 import base64
 import json
 import numpy as np
+from keras.models import load_model
 
-from flask import Flask, send_file
-from gpaulo.backup import load
-from gpaulo.predict import suggest
+from flask import Flask, send_file, request
+from gpaulo.game import suggest
 
 
 # build neural networks
-nn = load("tictactoe")
+nn = load_model("model2.h5")
+nn.predict(np.zeros((1,9)))
+nn.summary()
 
 # HTTP Server
 app = Flask(__name__)
