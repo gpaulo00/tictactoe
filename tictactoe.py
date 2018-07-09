@@ -11,22 +11,25 @@ from gpaulo.game import suggest
 
 
 # build neural networks
-nn = load_model("model2.h5")
-nn.predict(np.zeros((1,9)))
+nn = load_model("models/tictactoe.hd5")
+nn.predict(np.zeros((1, 9)))
 nn.summary()
 
 # HTTP Server
 app = Flask(__name__)
 
+
 @app.route("/")
 def index():
-  return send_file("static/index.html", mimetype="text/html")
+    return send_file("static/index.html", mimetype="text/html")
+
 
 @app.route("/suggest/<id>")
 def resolve(id):
-  matrix = json.loads(base64.b64decode(id))
-  res = suggest(nn, np.array(matrix))
-  return json.dumps(res)
+    matrix = json.loads(base64.b64decode(id))
+    res = suggest(nn, np.array(matrix))
+    return json.dumps(res)
+
 
 if __name__ == "__main__":
-  app.run(host="0.0.0.0")
+    app.run(host="0.0.0.0")
